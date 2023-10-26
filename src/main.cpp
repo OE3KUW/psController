@@ -1,6 +1,6 @@
 /******************************************************************
-                        LoLin32 psController
-                                                    қuran jan 2023
+                        LoLin32 psController 
+                                                    қuran nov 2023
 ******************************************************************/
 #include <Arduino.h>
 #include <PS4Controller.h>
