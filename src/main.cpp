@@ -161,6 +161,8 @@ void loop()
     {
         // "entprellt" 
 
+        tenMSecFlag = FALSE;
+
         if(PS4.L1()) {LDir = LDir ? 0 : 1;  digitalWrite(WHEEL_L_DIRECTION, LDir);}
         if(PS4.R1()) {RDir = RDir ? 0 : 1;  digitalWrite(WHEEL_R_DIRECTION, RDir);}
 
