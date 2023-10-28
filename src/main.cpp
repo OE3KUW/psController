@@ -25,8 +25,8 @@
 
 #define WHEEL_L                         2
 #define WHEEL_R                         A4
-#define WHEEL_L_DIRECTION               A5 
-#define WHEEL_R_DIRECTION               15
+#define WHEEL_L_DIRECTION               15 
+#define WHEEL_R_DIRECTION               A5
 
 
 
