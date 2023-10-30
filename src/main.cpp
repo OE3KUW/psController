@@ -70,9 +70,9 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 
-//IPAddress lclIP(192,168,2,219);
-//IPAddress gateway(192,168,2,1);
-//IPAddress subnet(255,255,255,0);
+IPAddress lclIP(192,168,2,219);
+IPAddress gateway(192,168,2,1);
+IPAddress subnet(255,255,255,0);
 
 
 const int led5 = 5;
@@ -245,6 +245,13 @@ void setup()
 
     server.serveStatic("/", SPIFFS, "/");
 
+    server.on("/logo", HTTP_GET, 
+    [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/logo.png", "image/png");
+    }
+             );
+
     // Start server:
 
     server.begin();
@@ -258,9 +265,10 @@ void loop()
     static int t1 = 0;
 
     ws.cleanupClients();
-    digitalWrite(led5, ledState);
+    
+    if (ledState == 1) digitalWrite(led5, 0); else digitalWrite(led5, 1);
 
-    if (oneSecFlag)
+    if (oneSecFlag)  // changed to 250 msec ... 
     {
         oneSecFlag = FALSE;
 

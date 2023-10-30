@@ -1,4 +1,4 @@
-var gateway = 'ws://${window.location.hostname}/ws';
+var gateway = `ws://${window.location.hostname}/ws`;
 var websocket;
 window.addEventListener('load', onload);
 
@@ -17,7 +17,7 @@ function initWebSocket()
     websocket.onmessage = onMessage;
 }
 
-function open(event)
+function onOpen(event)
 {
     console.log('Connection opened');
 }
@@ -36,8 +36,8 @@ function onMessage(event)
 
 function initButton()
 {
-    document.getElementById('bON'.addEventListener('click', toggleON));
-    document.getElementById('bOFF'.addEventListener('click', toggleOFF));
+    document.getElementById('bON').addEventListener('click', toggleON);
+    document.getElementById('bOFF').addEventListener('click', toggleOFF);
 }
 
 function toggleON(event)
