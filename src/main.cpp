@@ -62,6 +62,10 @@ volatile int LDir;
 volatile int RDir;
 
 volatile int pointer;
+volatile float batteryLevel;
+
+volatile int go;
+
 
 const char *ssid = "A1-A82861";
 const char *password = "7PMGDV96J8";
@@ -76,7 +80,7 @@ IPAddress subnet(255,255,255,0);
 
 
 const int led5 = 5;
-bool ledState = 0;
+bool ledState = 1;
 
 // -------  functions ---------------------------------------------
 
@@ -96,18 +100,27 @@ void initWiFi()
 {
     //WiFi.softAPConfig(lclIP, gateway, subnet);
     WiFi.mode(WIFI_STA);
+
     WiFi.begin(ssid, password);
+
+
     Serial.println("Connection to WiFi . . .");
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.print(" .");
         delay(1000);
     }
+
+    // ?? WiFi.config(lclIP, gateway, subnet);
+
+    Serial.println("IP:");
     Serial.println(WiFi.localIP());
 }
 
 String processor(const String& var)
 {
+    String battery;
+
     if (var == "STATE") 
     {
         if (digitalRead(led5))
@@ -119,13 +132,22 @@ String processor(const String& var)
             ledState = 0; return "OFF";
         }
     }
+
+    if (var == "BATTERY")
+    {
+       battery = String(batteryLevel).c_str();
+       return battery;
+    }
+
     return String();
 }
 
 void notifyClients(String state)
 {
     ws.textAll(state);
+    //ws.text(1, state); // State
 }
+
 
 void handleWebSocketMessage(void *arg, uint8_t * data, size_t len)
 {
@@ -180,6 +202,7 @@ void setup()
 {
     Serial.begin(115200);
     Serial.println("start!");
+    go = 1; 
 
     timer = timerBegin(0, 80, true);
     timerAttachInterrupt(timer, &myTimer, true);
@@ -202,6 +225,9 @@ void setup()
     pinMode(BATTERY_LEVEL, INPUT);
 
     // -- digitalWrite(ON_BOARD_LED, L); // on ! ... blue 
+
+    digitalWrite(led5, L);
+
 
     digitalWrite(WHEEL_L_DIRECTION, L);
     digitalWrite(WHEEL_R_DIRECTION, H);
@@ -261,107 +287,129 @@ void loop()
 {
     uint8_t leftstickXDATA0 = 0;
     uint8_t leftstickXDATA1 = 0;
-    float x;
     static int t1 = 0;
+    String battery;
 
     ws.cleanupClients();
-    
-    if (ledState == 1) digitalWrite(led5, 0); else digitalWrite(led5, 1);
 
-    if (oneSecFlag)  // changed to 250 msec ... 
+    if (ledState == 1) {digitalWrite(led5, 0); go = 1;} else { digitalWrite(led5, 1); go = 0;}
+
+
+    if (go == 0)
     {
-        oneSecFlag = FALSE;
+        vL = vR = 0;
 
-        pulse = pulse ? 0 : 1;
+        leds[0] = CRGB{0, 0, 0}; // R B G
+        leds[1] = CRGB{0, 0, 0};
+        leds[2] = CRGB{0, 0, 0};
+        leds[3] = CRGB{0, 0, 0};
 
-        //digitalWrite(ON_BOARD_LED, pulse);
+        FastLED.show();
+    }
+    else
+    {
+
+        if (oneSecFlag)  // changed to 250 msec ... 
+        {
+            oneSecFlag = FALSE;
+
+            pulse = pulse ? 0 : 1;
+
+            //digitalWrite(ON_BOARD_LED, pulse);
         
-        x = analogRead(BATTERY_LEVEL) / REFV;
+            batteryLevel = analogRead(BATTERY_LEVEL) / REFV;
 
-        // Serial.print(x); Serial.println(" V");
+            battery = String(batteryLevel).c_str();
 
-
-        if(PS4.isConnected())
-        {
-            connected = 1;
-
-            // digitalWrite(ON_BOARD_LED, pulse);  // off
-
-            leds[0] = CRGB{0, 0, 255}; // R B G
-            leds[1] = CRGB{0, 255, 0};
-            leds[2] = CRGB{255, 0, 255};  // Yellow: FF00FF
-            leds[3] = CRGB{255, 0, 0};
-
-            FastLED.show();
-
-            if(PS4.Triangle()) Serial.println("Triangle!"); 
-            if(PS4.Up()) Serial.println("Up!");
+            notifyClients(battery);
+        
 
 
-            //Serial.print(PS4.L2Value());
-            //Serial.print(PS4.R2Value());
-            //Serial.print(PS4.GyrX());
-            //Serial.println(PS4.GyrY());
-            
-        }
-        else
-        {
-            //Serial.print("*");
+            // Serial.print(x); Serial.println(" V");
 
-            pointer++; if (pointer >= 4) pointer = 0;
 
-            switch(pointer)
+            if(PS4.isConnected())
             {
-                case 0:
-                    leds[0] = CRGB{255, 255, 255}; // R B G
-                    leds[1] = CRGB{255, 255, 255};
-                    leds[2] = CRGB{0, 0, 0};  // Yellow: FF00FF
-                    leds[3] = CRGB{0, 0, 0};
-                break;
+                connected = 1;
 
-                case 1:
-                    leds[0] = CRGB{0, 0, 0}; // R B G
-                    leds[1] = CRGB{255, 255, 255};
-                    leds[2] = CRGB{255, 255, 255};  // Yellow: FF00FF
-                    leds[3] = CRGB{0, 0, 0};
-                break;
+                // digitalWrite(ON_BOARD_LED, pulse);  // off
 
-                case 2:
-                    leds[0] = CRGB{0, 0, 0}; // R B G
-                    leds[1] = CRGB{0, 0, 0};
-                    leds[2] = CRGB{255, 255, 255};  // Yellow: FF00FF
-                    leds[3] = CRGB{255, 255, 255};
-                break;
+                leds[0] = CRGB{0, 0, 255}; // R B G
+                leds[1] = CRGB{0, 255, 0};
+                leds[2] = CRGB{255, 0, 255};  // Yellow: FF00FF
+                leds[3] = CRGB{255, 0, 0};
 
-                case 3:
-                    leds[0] = CRGB{255, 255, 255}; // R B G
-                    leds[1] = CRGB{0, 0, 0};
-                    leds[2] = CRGB{0, 0, 0};  // Yellow: FF00FF
-                    leds[3] = CRGB{255, 255, 255};
-                break;
+                FastLED.show();
+
+                if(PS4.Triangle()) Serial.println("Triangle!"); 
+                if(PS4.Up()) Serial.println("Up!");
+
+
+                //Serial.print(PS4.L2Value());
+                //Serial.print(PS4.R2Value());
+                //Serial.print(PS4.GyrX());
+                //Serial.println(PS4.GyrY());
+            
+            }
+            else
+            {
+                //Serial.print("*");
+
+                pointer++; if (pointer >= 4) pointer = 0;
+
+                switch(pointer)
+                {
+                    case 0:
+                        leds[0] = CRGB{255, 255, 255}; // R B G
+                        leds[1] = CRGB{255, 255, 255};
+                        leds[2] = CRGB{0, 0, 0};  // Yellow: FF00FF
+                        leds[3] = CRGB{0, 0, 0};
+                    break;
+
+                    case 1:
+                        leds[0] = CRGB{0, 0, 0}; // R B G
+                        leds[1] = CRGB{255, 255, 255};
+                        leds[2] = CRGB{255, 255, 255};  // Yellow: FF00FF
+                        leds[3] = CRGB{0, 0, 0};
+                    break;
+
+                    case 2:
+                        leds[0] = CRGB{0, 0, 0}; // R B G
+                        leds[1] = CRGB{0, 0, 0};
+                        leds[2] = CRGB{255, 255, 255};  // Yellow: FF00FF
+                        leds[3] = CRGB{255, 255, 255};
+                    break;
+
+                    case 3:
+                        leds[0] = CRGB{255, 255, 255}; // R B G
+                        leds[1] = CRGB{0, 0, 0};
+                        leds[2] = CRGB{0, 0, 0};  // Yellow: FF00FF
+                        leds[3] = CRGB{255, 255, 255};
+                    break;
+
+                }
+
+                FastLED.show();
 
             }
+        }    
 
-            FastLED.show();
+        if (tenMSecFlag)
+        {
+            // "entprellt" 
+
+            tenMSecFlag = FALSE;
+
+            if(PS4.L1()) {LDir = LDir ? 0 : 1;  digitalWrite(WHEEL_L_DIRECTION, LDir);}
+            if(PS4.R1()) {RDir = RDir ? 0 : 1;  digitalWrite(WHEEL_R_DIRECTION, RDir);}
 
         }
-    }    
 
-    if (tenMSecFlag)
-    {
-        // "entprellt" 
-
-        tenMSecFlag = FALSE;
-
-        if(PS4.L1()) {LDir = LDir ? 0 : 1;  digitalWrite(WHEEL_L_DIRECTION, LDir);}
-        if(PS4.R1()) {RDir = RDir ? 0 : 1;  digitalWrite(WHEEL_R_DIRECTION, RDir);}
-
-    }
-
-    if (connected)
-    {
-        vL = PS4.L2Value();
-        vR = PS4.R2Value();
+        if (connected)
+        {
+            vL = PS4.L2Value();
+            vR = PS4.R2Value();
+        }
     }
 
 }    
@@ -400,6 +448,7 @@ void IRAM_ATTR myTimer(void)   // periodic timer interrupt, expires each 0.1 mse
 /* ------ für ein anderes Project ... Siehe Build Web Servers Seite 270 ff... 
 
 board_build.partitions = huge_app.csv 
+<p class="card-title"><i class="fas fa-lightbulb"></i> GPIO 5</p>
 
 
 

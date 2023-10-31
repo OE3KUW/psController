@@ -30,7 +30,14 @@ function onClose(event)
 
 function onMessage(event)
 {
-    document.getElementById('state').innerHTML = event.data;
+    if ((event.data == "ON") || (event.data == "OFF"))
+    {
+        document.getElementById('state').innerHTML = event.data;
+    }    
+    else
+    {
+        document.getElementById('battery').innerHTML = event.data;
+    }    
     console.log(event.data);
 }
 
