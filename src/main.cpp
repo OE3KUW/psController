@@ -1,9 +1,9 @@
 /******************************************************************
+
                         LoLin32 psController 
+
                                                     қuran nov 2023
 ******************************************************************/
-// im file Fastled.h 
-// #ifdef SmartMatrix_h   warum auch immer - abgeschalten! 
 
 #include <Arduino.h>
 #include <PS4Controller.h>
@@ -15,6 +15,8 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "SPIFFS.h"
+
+#include <Wire.h>
 
 
 // -------  defines -----------------------------------------------
@@ -43,10 +45,13 @@
 
 #define REFV                            685.0     // factor
 
+#define MFS                             0x1e
+
 
 // -------  global Variables --------------------------------------
 
 volatile int oneSecFlag;
+volatile int qSecFlag;
 volatile int tenMSecFlag;
 
 hw_timer_t *timer = NULL;
@@ -62,13 +67,20 @@ volatile int LDir;
 volatile int RDir;
 
 volatile int pointer;
-volatile float batteryLevel;
-
+volatile float batteryLevel = 0.;
+volatile int winkelL = 0; 
+volatile int oldWinkelL = 0;
 volatile int go;
+volatile int startWiFi = 0;
 
 
-const char *ssid = "A1-A82861";
-const char *password = "7PMGDV96J8";
+//const char *ssid = "Wolfgang Uriel Kurans Handy"; 
+//const char *password = "x1234567"; 
+
+
+const char* ssid = "A1-A82861";
+const char* password = "7PMGDV96J8";
+                                                                                                                                                                                          
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -105,10 +117,11 @@ void initWiFi()
 
 
     Serial.println("Connection to WiFi . . .");
-    while (WiFi.status() != WL_CONNECTED)
+    while ((WiFi.status() != WL_CONNECTED) && (startWiFi < 21))
     {
         Serial.print(" .");
         delay(1000);
+        startWiFi++;
     }
 
     // ?? WiFi.config(lclIP, gateway, subnet);
@@ -204,14 +217,18 @@ void setup()
     Serial.println("start!");
     go = 1; 
 
+
     timer = timerBegin(0, 80, true);
     timerAttachInterrupt(timer, &myTimer, true);
     timerAlarmWrite(timer, 100, true);  // 0.1 msec
     timerAlarmEnable(timer);
     
     oneSecFlag = FALSE; 
+    qSecFlag = FALSE;
     tenMSecFlag = FALSE; 
-    PS4.begin("10:20:30:40:50:62");
+
+
+
     Serial.println("ready!");
 
     // -- pinMode(ON_BOARD_LED, OUTPUT);
@@ -257,6 +274,16 @@ void setup()
 
     FastLED.show();
 
+    // Magnetfeldsensor:
+
+    Wire.begin();
+    Wire.beginTransmission(MFS);
+    Wire.write(0x02);        // select mode register
+    Wire.write(0x00);        // continuous measurement mode
+    Wire.endTransmission();
+
+
+
 
     initSPIFFS();
     initWiFi();
@@ -289,10 +316,60 @@ void loop()
     uint8_t leftstickXDATA1 = 0;
     static int t1 = 0;
     String battery;
+    int akn;
+    int angleXY, angleYZ, angleZX;
+    static int x, y, z;
+
+    String winkel;
+    
+
 
     ws.cleanupClients();
 
     if (ledState == 1) {digitalWrite(led5, 0); go = 1;} else { digitalWrite(led5, 1); go = 0;}
+
+    if (oneSecFlag == TRUE)  // all Seconds 
+    {
+            oneSecFlag = FALSE;
+
+            batteryLevel = analogRead(BATTERY_LEVEL) / REFV;
+
+            //batteryLevel += 3.75;  // for tests only
+            
+            //if (batteryLevel > 359) batteryLevel = 0;
+
+            battery = String(batteryLevel).c_str();
+
+            battery = "BAT" + battery;
+
+            notifyClients(battery);
+
+
+            // Magnetfeldsensor: 
+
+/*            Wire.beginTransmission(MFS);
+            Wire.write(0x03);
+            akn = Wire.endTransmission();
+
+            Wire.requestFrom(MFS, 6);
+            if (6 <= Wire.available())
+            {
+                x =  Wire.read() << 8; x |= Wire.read();
+                z =  Wire.read() << 8; z |= Wire.read();
+                y =  Wire.read() << 8; y |= Wire.read();
+            }
+
+            angleXY = atan2(-y,  x) / M_PI * 180;  if (angleXY < 0) angleXY += 360;
+            angleYZ = atan2(-z, -y) / M_PI * 180;  if (angleYZ < 0) angleYZ += 360;
+            angleZX = atan2( x, -z) / M_PI * 180;  if (angleZX < 0) angleZX += 360;
+
+            x = angleXY;
+            y = angleYZ;
+            z = angleZX;
+*/
+
+
+    }
 
 
     if (go == 0)
@@ -309,19 +386,14 @@ void loop()
     else
     {
 
-        if (oneSecFlag)  // changed to 250 msec ... 
+        if (qSecFlag)  // all 250 msec ... 
         {
-            oneSecFlag = FALSE;
+            qSecFlag = FALSE;
 
             pulse = pulse ? 0 : 1;
 
             //digitalWrite(ON_BOARD_LED, pulse);
         
-            batteryLevel = analogRead(BATTERY_LEVEL) / REFV;
-
-            battery = String(batteryLevel).c_str();
-
-            notifyClients(battery);
         
 
 
@@ -392,6 +464,22 @@ void loop()
                 FastLED.show();
 
             }
+
+            if (LDir == H) winkelL = winkelL + vL/10.; else winkelL = winkelL - vL/10.;
+            if (RDir == H) winkelL = winkelL + vR/10.; else winkelL = winkelL - vR/10.;
+
+
+            if (abs((winkelL - oldWinkelL)) > 0.1) 
+            {
+                winkel = String(winkelL).c_str();
+                winkel = "WIN" + winkel;
+                notifyClients(winkel);
+                oldWinkelL = winkelL;
+            }
+
+
+
+
         }    
 
         if (tenMSecFlag)
@@ -418,18 +506,26 @@ void loop()
 
 void IRAM_ATTR myTimer(void)   // periodic timer interrupt, expires each 0.1 msec
 {
-    static int32_t tick = 0;
+    static int32_t otick  = 0;
+    static int32_t qtick = 0;
     static int32_t mtick = 0;
     static unsigned char ramp = 0;
     
-    tick++;
+    otick++;
+    qtick++;
     mtick++;
     ramp++;
 
-    if (tick >= WAIT_250_MSEC) 
+    if (otick >= WAIT_ONE_SEC) 
     {
         oneSecFlag = TRUE;
-        tick = 0; 
+        otick = 0; 
+    }
+
+    if (qtick >= WAIT_250_MSEC) 
+    {
+        qSecFlag = TRUE;
+        qtick = 0; 
     }
 
     if (mtick >= WAIT_ONE_10MSEC) 
