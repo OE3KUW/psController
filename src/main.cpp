@@ -226,7 +226,7 @@ void setup()
     oneSecFlag = FALSE; 
     qSecFlag = FALSE;
     tenMSecFlag = FALSE; 
-
+    PS4.begin("10:20:30:40:50:62");
 
 
     Serial.println("ready!");
@@ -487,16 +487,16 @@ void loop()
             // "entprellt" 
 
             tenMSecFlag = FALSE;
+       
 
-            if(PS4.L1()) {LDir = LDir ? 0 : 1;  digitalWrite(WHEEL_L_DIRECTION, LDir);}
-            if(PS4.R1()) {RDir = RDir ? 0 : 1;  digitalWrite(WHEEL_R_DIRECTION, RDir);}
-
-        }
-
-        if (connected)
-        {
-            vL = PS4.L2Value();
-            vR = PS4.R2Value();
+            if (connected)
+            {
+                vL = PS4.L2Value();
+                vR = PS4.R2Value();
+            
+                if(PS4.L1()) {LDir = LDir ? 0 : 1;  digitalWrite(WHEEL_L_DIRECTION, LDir);}
+                if(PS4.R1()) {RDir = RDir ? 0 : 1;  digitalWrite(WHEEL_R_DIRECTION, RDir);}
+            }
         }
     }
 
