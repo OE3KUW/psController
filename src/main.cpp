@@ -2,7 +2,7 @@
 
                         LoLin32 psController 
 
-                                                    қuran nov 2023
+                                                    қuran dez 2023
 ******************************************************************/
 
 #include <Arduino.h>
@@ -78,8 +78,8 @@ volatile int startWiFi = 0;
 //const char *password = "x1234567"; 
 
 
-const char* ssid = /********/                                                                                           "A1-A82861";
-const char* password = /********/                                                                                       "7PMGDV96J8";
+const char* ssid = /********/;
+const char* password = /********/;
                                                                                                                                                                                           
 
 AsyncWebServer server(80);
@@ -115,7 +115,6 @@ void initWiFi()
 
     WiFi.begin(ssid, password);
 
-
     Serial.println("Connection to WiFi . . .");
     while ((WiFi.status() != WL_CONNECTED) && (startWiFi < 21))
     {
@@ -123,8 +122,6 @@ void initWiFi()
         delay(1000);
         startWiFi++;
     }
-
-    // ?? WiFi.config(lclIP, gateway, subnet);
 
     Serial.println("IP:");
     Serial.println(WiFi.localIP());
@@ -252,9 +249,6 @@ void setup()
     digitalWrite(WHEEL_L, L); // stop !
     digitalWrite(WHEEL_R, L); // stop !
 
-    //digitalWrite(WHEEL_L, H); // go !
-    //digitalWrite(WHEEL_R, H); // go !
-
     pulse = 0;
     connected = 0;
     LDir = 0;
@@ -274,15 +268,13 @@ void setup()
 
     FastLED.show();
 
-    // Magnetfeldsensor:
+    // Magnetfeldsensor:  preparation phase ...
 
     Wire.begin();
     Wire.beginTransmission(MFS);
     Wire.write(0x02);        // select mode register
     Wire.write(0x00);        // continuous measurement mode
     Wire.endTransmission();
-
-
 
 
     initSPIFFS();
@@ -344,9 +336,7 @@ void loop()
 
             notifyClients(battery);
 
-
-            // Magnetfeldsensor: 
-
+// Magnetfeldsensor:  not implemented jet! 
 /*            Wire.beginTransmission(MFS);
             Wire.write(0x03);
             akn = Wire.endTransmission();
@@ -392,13 +382,8 @@ void loop()
 
             pulse = pulse ? 0 : 1;
 
-            //digitalWrite(ON_BOARD_LED, pulse);
-        
-        
-
-
+            // digitalWrite(ON_BOARD_LED, pulse);
             // Serial.print(x); Serial.println(" V");
-
 
             if(PS4.isConnected())
             {
@@ -416,17 +401,14 @@ void loop()
                 if(PS4.Triangle()) Serial.println("Triangle!"); 
                 if(PS4.Up()) Serial.println("Up!");
 
-
-                //Serial.print(PS4.L2Value());
-                //Serial.print(PS4.R2Value());
-                //Serial.print(PS4.GyrX());
-                //Serial.println(PS4.GyrY());
+                // Serial.print(PS4.L2Value());
+                // Serial.print(PS4.R2Value());
+                // Serial.print(PS4.GyrX());
+                // Serial.println(PS4.GyrY());
             
             }
             else
             {
-                //Serial.print("*");
-
                 pointer++; if (pointer >= 4) pointer = 0;
 
                 switch(pointer)
@@ -458,7 +440,6 @@ void loop()
                         leds[2] = CRGB{0, 0, 0};  // Yellow: FF00FF
                         leds[3] = CRGB{255, 255, 255};
                     break;
-
                 }
 
                 FastLED.show();
@@ -468,7 +449,6 @@ void loop()
             if (LDir == H) winkelL = winkelL + vL/10.; else winkelL = winkelL - vL/10.;
             if (RDir == H) winkelL = winkelL + vR/10.; else winkelL = winkelL - vR/10.;
 
-
             if (abs((winkelL - oldWinkelL)) > 0.1) 
             {
                 winkel = String(winkelL).c_str();
@@ -476,10 +456,6 @@ void loop()
                 notifyClients(winkel);
                 oldWinkelL = winkelL;
             }
-
-
-
-
         }    
 
         if (tenMSecFlag)
@@ -487,7 +463,6 @@ void loop()
             // "entprellt" 
 
             tenMSecFlag = FALSE;
-       
 
             if (connected)
             {
@@ -534,18 +509,9 @@ void IRAM_ATTR myTimer(void)   // periodic timer interrupt, expires each 0.1 mse
         mtick = 0; 
     }
 
+    // PWM:
+
     if (ramp > vL) digitalWrite(WHEEL_L, L);  else digitalWrite(WHEEL_L, H);
     if (ramp > vR) digitalWrite(WHEEL_R, L);  else digitalWrite(WHEEL_R, H);
 
 }
-
-
-
-/* ------ für ein anderes Project ... Siehe Build Web Servers Seite 270 ff... 
-
-board_build.partitions = huge_app.csv 
-<p class="card-title"><i class="fas fa-lightbulb"></i> GPIO 5</p>
-
-
-
-*/
