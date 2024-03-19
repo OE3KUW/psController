@@ -78,8 +78,8 @@ volatile int startWiFi = 0;
 //const char *password = "x1234567"; 
 
 
-const char* ssid = /********/;
-const char* password = /********/;
+const char* ssid = "iot122023";                                                                                  //                     "A1-A82861";///********/;
+const char* password = "iot122023secret";                                                                        //                     "7PMGDV96J8";///********/;
                                                                                                                                                                                           
 
 AsyncWebServer server(80);
@@ -136,10 +136,12 @@ String processor(const String& var)
         if (digitalRead(led5))
         {
             ledState = 1; return "ON";
+            Serial.println("on");
         }
         else
         {
             ledState = 0; return "OFF";
+            Serial.println("off");
         }
     }
 
@@ -169,11 +171,15 @@ void handleWebSocketMessage(void *arg, uint8_t * data, size_t len)
         {
             ledState = 1;
             notifyClients("ON");
+
+            Serial.println("handleWebSocketMessage: on");
+
         }
         if (strcmp((char*)data, "bOFF") == 0)
         {
             ledState = 0;
             notifyClients("OFF");
+            Serial.println("handleWebSocketMessage: off");
         }
     }
 }

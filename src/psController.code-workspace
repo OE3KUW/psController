@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"name": "psController",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"cortex-debug.openocdPath": "C:/CortexM0/OpenOCD/src/openocd.exe"
+	}
+}

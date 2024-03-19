@@ -53,6 +53,7 @@ function onMessage(event) {
         var winkel = parseInt(text);
         svgRectA.setAttribute("transform","rotate(" + winkel + ", 200, 150 )");
         svgRectB.setAttribute("transform","rotate(" + winkel + ", 200, 150 )");
+        console.log("winkel" + winkel);
     }
     
 }
