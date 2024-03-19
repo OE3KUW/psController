@@ -78,18 +78,18 @@ volatile int startWiFi = 0;
 //const char *password = "x1234567"; 
 
 
-const char* ssid = "iot122023";                                                                                  //                     "A1-A82861";///********/;
-const char* password = "iot122023secret";                                                                        //                     "7PMGDV96J8";///********/;
+const char* ssid =                                                                        "iot122023";                                                                                  //                     "A1-A82861";///********/;
+const char* password =                                                            "iot122023secret";                                                                        //                     "7PMGDV96J8";///********/;
                                                                                                                                                                                           
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
-
+/*
 IPAddress lclIP(192,168,2,219);
 IPAddress gateway(192,168,2,1);
 IPAddress subnet(255,255,255,0);
-
+*/
 
 const int led5 = 5;
 bool ledState = 1;
