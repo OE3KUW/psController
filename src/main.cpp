@@ -2,10 +2,11 @@
 
                         LoLin32 psController 
 
-                                                    қuran dez 2023
+                                                  қuran machr 2024
 ******************************************************************/
 
 #include <Arduino.h>
+#include <stdio.h>
 #include <PS4Controller.h>
 
 #define FASTLED_ALL_PINS_HARDWARE_SPI
@@ -17,6 +18,7 @@
 #include "SPIFFS.h"
 
 #include <Wire.h>
+#include <serviceSetIdentifier.h>
 
 
 // -------  defines -----------------------------------------------
@@ -46,7 +48,7 @@
 #define REFV                            685.0     // factor
 
 #define MFS                             0x1e
-
+#define LEN                             21
 
 // -------  global Variables --------------------------------------
 
@@ -74,12 +76,6 @@ volatile int go;
 volatile int startWiFi = 0;
 
 
-//const char *ssid = "Wolfgang Uriel Kurans Handy"; 
-//const char *password = "x1234567"; 
-
-
-const char* ssid =                                                                        "iot122023";                                                                                  //                     "A1-A82861";///********/;
-const char* password =                                                            "iot122023secret";                                                                        //                     "7PMGDV96J8";///********/;
                                                                                                                                                                                           
 
 AsyncWebServer server(80);
@@ -100,31 +96,36 @@ void initSPIFFS()
 {
     if (!SPIFFS.begin(true))
     {
-        Serial.println("An error has occurred while mounting SPIFFS");
+        printf("An error has occurred while mounting SPIFFS\n");
     }
     else
     {
-        Serial.println("SPIFFS mounted successfully!");
+        printf("SPIFFS mounted successfully!\n");
     }
 }
 
 void initWiFi()
 {
+    char text[LEN];
     //WiFi.softAPConfig(lclIP, gateway, subnet);
     WiFi.mode(WIFI_STA);
 
     WiFi.begin(ssid, password);
 
-    Serial.println("Connection to WiFi . . .");
+    printf("Connection to WiFi . . .");
     while ((WiFi.status() != WL_CONNECTED) && (startWiFi < 21))
     {
-        Serial.print(" .");
         delay(1000);
+        printf(" .");
         startWiFi++;
     }
 
-    Serial.println("IP:");
-    Serial.println(WiFi.localIP());
+    //Serial.println("IP:");
+    //Serial.println(WiFi.localIP());
+
+    uint32_t ip = (uint32_t) WiFi.localIP();
+    sprintf(text, "%u.%u.%u.%u", ip & 0xFF, (ip>>8) & 0xFF, (ip>>16) & 0xFF, (ip>>24) & 0xFF );
+    printf("\nIP: %s\n", text);
 }
 
 String processor(const String& var)
@@ -136,12 +137,12 @@ String processor(const String& var)
         if (digitalRead(led5))
         {
             ledState = 1; return "ON";
-            Serial.println("on");
+            printf("on\n");
         }
         else
         {
             ledState = 0; return "OFF";
-            Serial.println("off");
+            printf("off\n");
         }
     }
 
@@ -172,14 +173,14 @@ void handleWebSocketMessage(void *arg, uint8_t * data, size_t len)
             ledState = 1;
             notifyClients("ON");
 
-            Serial.println("handleWebSocketMessage: on");
+            printf("handleWebSocketMessage: on\n");
 
         }
         if (strcmp((char*)data, "bOFF") == 0)
         {
             ledState = 0;
             notifyClients("OFF");
-            Serial.println("handleWebSocketMessage: off");
+            printf("handleWebSocketMessage: off\n");
         }
     }
 }
@@ -190,11 +191,11 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient * client, AwsEventType
     switch(type)
     {
         case WS_EVT_CONNECT: 
-             Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+             printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
         break;
 
         case WS_EVT_DISCONNECT:
-             Serial.printf("WebSocket client #%u disconnected\n", client->id());
+             printf("WebSocket client #%u disconnected\n", client->id());
         break;
 
         case WS_EVT_DATA:
@@ -217,7 +218,7 @@ void initWebSocket()
 void setup() 
 {
     Serial.begin(115200);
-    Serial.println("start!");
+    printf("start!");
     go = 1; 
 
 
@@ -232,7 +233,7 @@ void setup()
     PS4.begin("10:20:30:40:50:62");
 
 
-    Serial.println("ready!");
+    printf("ready!\n");
 
     // -- pinMode(ON_BOARD_LED, OUTPUT);
     pinMode(led5, OUTPUT);
@@ -315,12 +316,13 @@ void loop()
     static int t1 = 0;
     String battery;
     int akn;
+    uint8_t xH, xL, yH, yL, zH, zL;
+    uint16_t x, y, z;
+    static uint16_t xmax = 0, xmin = 0xffff, ymax = 0, ymin = 0xffff, zmax = 0, zmin = 0xffff;
+    uint16_t xSpan, xMidd, ySpan, yMidd, zSpan, zMidd;
+    float r, m, n;
     int angleXY, angleYZ, angleZX;
-    static int x, y, z;
-
     String winkel;
-    
-
 
     ws.cleanupClients();
 
@@ -341,29 +343,6 @@ void loop()
             battery = "BAT" + battery;
 
             notifyClients(battery);
-
-// Magnetfeldsensor:  not implemented jet! 
-/*            Wire.beginTransmission(MFS);
-            Wire.write(0x03);
-            akn = Wire.endTransmission();
-
-            Wire.requestFrom(MFS, 6);
-            if (6 <= Wire.available())
-            {
-                x =  Wire.read() << 8; x |= Wire.read();
-                z =  Wire.read() << 8; z |= Wire.read();
-                y =  Wire.read() << 8; y |= Wire.read();
-            }
-
-            angleXY = atan2(-y,  x) / M_PI * 180;  if (angleXY < 0) angleXY += 360;
-            angleYZ = atan2(-z, -y) / M_PI * 180;  if (angleYZ < 0) angleYZ += 360;
-            angleZX = atan2( x, -z) / M_PI * 180;  if (angleZX < 0) angleZX += 360;
-
-            x = angleXY;
-            y = angleYZ;
-            z = angleZX;
-*/
-
 
     }
 
@@ -404,13 +383,8 @@ void loop()
 
                 FastLED.show();
 
-                if(PS4.Triangle()) Serial.println("Triangle!"); 
-                if(PS4.Up()) Serial.println("Up!");
-
-                // Serial.print(PS4.L2Value());
-                // Serial.print(PS4.R2Value());
-                // Serial.print(PS4.GyrX());
-                // Serial.println(PS4.GyrY());
+                if(PS4.Triangle()) printf("Triangle!\n"); 
+                if(PS4.Up()) printf("Up!\n");
             
             }
             else
@@ -452,10 +426,45 @@ void loop()
 
             }
 
-            if (LDir == H) winkelL = winkelL + vL/10.; else winkelL = winkelL - vL/10.;
-            if (RDir == H) winkelL = winkelL + vR/10.; else winkelL = winkelL - vR/10.;
+            Wire.beginTransmission(MFS);
+            Wire.write(0x03);
+            akn = Wire.endTransmission();
 
-            if (abs((winkelL - oldWinkelL)) > 0.1) 
+            Wire.requestFrom(MFS, 6);
+            if (6 <= Wire.available())
+            {
+                xH = Wire.read(); xL = Wire.read();
+                yH = Wire.read(); yL = Wire.read();
+                zH = Wire.read(); zL = Wire.read();
+
+                x = ((xH + 128) << 8) + xL;  // + 128 to position -> avoid negativ values
+                y = ((yH + 128) << 8) + yL;
+                z = ((zH + 128) << 8) + zL;
+            }
+
+            if (x > xmax) xmax = x; if (x < xmin) xmin = x; 
+            if (y > ymax) ymax = y; if (y < ymin) ymin = y; 
+            if (z > zmax) zmax = z; if (z < zmin) zmin = z; 
+
+            xSpan = (xmax - xmin) / 2; xMidd = (xmax + xmin) / 2; r = (float)(x - xMidd) / xSpan; 
+            ySpan = (ymax - ymin) / 2; yMidd = (ymax + ymin) / 2; m = (float)(y - yMidd) / ySpan; 
+            zSpan = (zmax - zmin) / 2; zMidd = (zmax + zmin) / 2; n = (float)(z - zMidd) / zSpan; 
+
+            angleXY = (int)(atan2(r, m) * 180 / M_PI);
+            angleYZ = (int)(atan2(m, n) * 180 / M_PI);
+            angleZX = (int)(atan2(n, r) * 180 / M_PI);
+
+
+            winkelL = - angleXY;
+
+//            printf("winkel xy %d yz %d zx %d \n", angleXY, angleYZ, angleZX);
+
+
+
+            // if (LDir == H) winkelL = winkelL + vL/10.; else winkelL = winkelL - vL/10.;
+            // if (RDir == H) winkelL = winkelL + vR/10.; else winkelL = winkelL - vR/10.;
+
+            if (abs((winkelL - oldWinkelL)) > 5) // to avoid interferece
             {
                 winkel = String(winkelL).c_str();
                 winkel = "WIN" + winkel;
