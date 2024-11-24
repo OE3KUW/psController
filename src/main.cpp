@@ -15,11 +15,10 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <EEPROM.h>
 #include "SPIFFS.h"
 
 #include <Wire.h>
-#include <serviceSetIdentifier.h>
-
 
 // -------  defines -----------------------------------------------
 
@@ -50,6 +49,12 @@
 #define MFS                             0x1e
 #define LEN                             21
 
+#define EEPROM_SIZE                      100
+#define EEPROM_ADDR                      0
+#define EEPROM_SSID_ADDR                 0
+#define EEPROM_PASSWORD_ADDR             40
+#define EEPROM_MOTOR_SYS_ADDR            80
+
 // -------  global Variables --------------------------------------
 
 volatile int oneSecFlag;
@@ -75,9 +80,14 @@ volatile int oldWinkelL = 0;
 volatile int go;
 volatile int startWiFi = 0;
 
+String receivedText = ""; // Variable zum Speichern der empfangenen Daten
+String ssidFromEEPROM = "";
+String passwordFromEEPROM = "";
+String motorSysFromEEPROM = "";
+String receivedWord = "";
 
-                                                                                                                                                                                          
-
+volatile int motorSys = 0;
+                            
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
@@ -110,7 +120,8 @@ void initWiFi()
     //WiFi.softAPConfig(lclIP, gateway, subnet);
     WiFi.mode(WIFI_STA);
 
-    WiFi.begin(ssid, password);
+    //WiFi.begin(ssid, password);
+    WiFi.begin(ssidFromEEPROM, passwordFromEEPROM);
 
     printf("Connection to WiFi . . .");
     while ((WiFi.status() != WL_CONNECTED) && (startWiFi < 21))
@@ -215,11 +226,63 @@ void initWebSocket()
 }
 
 
+void store2EEPROM(String word, int address);
+
+void store2EEPROM(String word, int address)
+{
+    int i;
+
+    for (i = 0; i < word.length(); i++)
+    {
+        EEPROM.write(address + i, word[i]);
+    }
+    EEPROM.write(address + word.length(), '\0');    
+    EEPROM.commit();  // Änderungen speichern
+}
+
+String readFromEEPROM(int address);
+String readFromEEPROM(int address)
+{
+  String word = "";
+  char c;
+  while ((c = EEPROM.read(address++)) != '\0') 
+  { // Lies Zeichen bis zur Null-Terminierung
+    word += c;
+  }
+  return word;
+}
+
+
+
 void setup() 
 {
+    uint8_t dataToWrite = 42; 
+    uint8_t dataToRead;
+    char text[LEN];
+
     Serial.begin(115200);
     printf("start!");
     go = 1; 
+
+    if (!EEPROM.begin(EEPROM_SIZE)) {
+        Serial.println("EEPROM initialisieren fehlgeschlagen!");
+        return;
+    }
+
+    //EEPROM.write(EEPROM_ADDR, dataToWrite);
+    //EEPROM.commit();  // Änderungen speichern
+    //dataToRead = 0;
+    //dataToRead = EEPROM.read(EEPROM_ADDR);
+    
+    Serial.println("Daten gelesen: \n" + String(dataToRead));
+
+    ssidFromEEPROM = readFromEEPROM(EEPROM_SSID_ADDR);
+    printf("im EEPROM gefunden: .%s.\n", ssidFromEEPROM);
+    passwordFromEEPROM = readFromEEPROM(EEPROM_PASSWORD_ADDR);
+    printf("im PASSWOR gefunden: .%s.\n", passwordFromEEPROM);
+    motorSysFromEEPROM = readFromEEPROM(EEPROM_MOTOR_SYS_ADDR);
+    motorSys = (char)motorSysFromEEPROM[0] - '0';
+    printf("MotorSystem: .%d.\n", motorSys);
 
 
     timer = timerBegin(0, 80, true);
@@ -275,13 +338,12 @@ void setup()
 
     FastLED.show();
 
-    // Magnetfeldsensor:  preparation phase ...
-
-    Wire.begin();
-    Wire.beginTransmission(MFS);
-    Wire.write(0x02);        // select mode register
-    Wire.write(0x00);        // continuous measurement mode
-    Wire.endTransmission();
+//24    // Magnetfeldsensor:  preparation phase ...
+//24    Wire.begin();
+//24    Wire.beginTransmission(MFS);
+//24    Wire.write(0x02);        // select mode register
+//24    Wire.write(0x00);        // continuous measurement mode
+//24    Wire.endTransmission();
 
 
     initSPIFFS();
@@ -323,6 +385,7 @@ void loop()
     float r, m, n;
     int angleXY, angleYZ, angleZX;
     String winkel;
+    int startIndex, endIndex;
 
     ws.cleanupClients();
 
@@ -424,45 +487,114 @@ void loop()
 
                 FastLED.show();
 
+
+                while (Serial.available() > 0) {
+                char receivedChar = Serial.read(); // Einzelnes Zeichen lesen
+
+                // Wenn ein Zeilenumbruch empfangen wird, Ausgabe und Text zurücksetzen
+                if (receivedChar == '\n') {
+                Serial.println("Empfangene Daten: " + receivedText); // Daten ausgeben
+                   receivedText = ""; // Textfeld zurücksetzen
+                } else {
+                receivedText += receivedChar; // Zeichen an das Textfeld anhängen
+
+                receivedText.trim();
+//#JASON Format: 
+                startIndex = 0; 
+                startIndex = receivedText.indexOf("\"ssid\":\"");
+                //"ssid":"   das sind 8 Zeichen!
+                if (startIndex != -1)
+                {
+                    startIndex += 8;
+                    endIndex = receivedText.indexOf("\"", startIndex);
+                    if (endIndex != -1)
+                    {
+                        receivedWord = receivedText.substring(startIndex, endIndex);
+                        printf("\nUserWort erkannt .%s.", receivedWord);
+                        store2EEPROM(receivedWord, EEPROM_SSID_ADDR);
+                    }
+                }
+
+                startIndex = receivedText.indexOf("\"password\":\"");
+                //"password":"   das sind 12 Zeichen!
+                if (startIndex != -1)
+                {
+                    startIndex += 12;
+                    endIndex = receivedText.indexOf("\"", startIndex);
+                    if (endIndex != -1)
+                    {
+                        receivedWord = receivedText.substring(startIndex, endIndex);
+                        printf("\nPassword erkannt .%s.", receivedWord);
+                        store2EEPROM(receivedWord, EEPROM_PASSWORD_ADDR);
+                    }
+                }
+
+
+                startIndex = receivedText.indexOf("\"motor-system\":\"");
+                //"motor-system":"   das sind 15 Zeichen!
+                if (startIndex != -1)
+                {
+                    startIndex += 16; // wegen dem '-' Zeichen ? 
+                    endIndex = receivedText.indexOf("\"", startIndex);
+                    if (endIndex != -1)
+                    {
+                        receivedWord = receivedText.substring(startIndex, endIndex);
+                        printf("\nMotorsystem erkannt .%s.", receivedWord);
+                        store2EEPROM(receivedWord, EEPROM_MOTOR_SYS_ADDR);
+                    }
+                }
+
+
+
+                if (receivedText == "RESET") 
+                {
+                    Serial.println("Rebooting...");
+                    ESP.restart(); // Neustart des ESP32
+                }
+        }
+    }
+
+
+
             }
 
-            Wire.beginTransmission(MFS);
-            Wire.write(0x03);
-            akn = Wire.endTransmission();
+//24            Wire.beginTransmission(MFS);
+//24            Wire.write(0x03);
+//24            akn = Wire.endTransmission();
 
-            Wire.requestFrom(MFS, 6);
-            if (6 <= Wire.available())
-            {
-                xH = Wire.read(); xL = Wire.read();
-                yH = Wire.read(); yL = Wire.read();
-                zH = Wire.read(); zL = Wire.read();
+//24            Wire.requestFrom(MFS, 6);
+//24            if (6 <= Wire.available())
+//24            {
+//24                xH = Wire.read(); xL = Wire.read();
+//24                yH = Wire.read(); yL = Wire.read();
+//24                zH = Wire.read(); zL = Wire.read();
 
-                x = ((xH + 128) << 8) + xL;  // + 128 to position -> avoid negativ values
-                y = ((yH + 128) << 8) + yL;
-                z = ((zH + 128) << 8) + zL;
-            }
+//24                x = ((xH + 128) << 8) + xL;  // + 128 to position -> avoid negativ values
+//24                y = ((yH + 128) << 8) + yL;
+//24                z = ((zH + 128) << 8) + zL;
+//24            }
 
-            if (x > xmax) xmax = x; if (x < xmin) xmin = x; 
-            if (y > ymax) ymax = y; if (y < ymin) ymin = y; 
-            if (z > zmax) zmax = z; if (z < zmin) zmin = z; 
+//24            if (x > xmax) xmax = x; if (x < xmin) xmin = x; 
+//24            if (y > ymax) ymax = y; if (y < ymin) ymin = y; 
+//24            if (z > zmax) zmax = z; if (z < zmin) zmin = z; 
 
-            xSpan = (xmax - xmin) / 2; xMidd = (xmax + xmin) / 2; r = (float)(x - xMidd) / xSpan; 
-            ySpan = (ymax - ymin) / 2; yMidd = (ymax + ymin) / 2; m = (float)(y - yMidd) / ySpan; 
-            zSpan = (zmax - zmin) / 2; zMidd = (zmax + zmin) / 2; n = (float)(z - zMidd) / zSpan; 
+//24            xSpan = (xmax - xmin) / 2; xMidd = (xmax + xmin) / 2; r = (float)(x - xMidd) / xSpan; 
+//24            ySpan = (ymax - ymin) / 2; yMidd = (ymax + ymin) / 2; m = (float)(y - yMidd) / ySpan; 
+//24            zSpan = (zmax - zmin) / 2; zMidd = (zmax + zmin) / 2; n = (float)(z - zMidd) / zSpan; 
 
-            angleXY = (int)(atan2(r, m) * 180 / M_PI);
-            angleYZ = (int)(atan2(m, n) * 180 / M_PI);
-            angleZX = (int)(atan2(n, r) * 180 / M_PI);
+//24            angleXY = (int)(atan2(r, m) * 180 / M_PI);
+//24            angleYZ = (int)(atan2(m, n) * 180 / M_PI);
+//24            angleZX = (int)(atan2(n, r) * 180 / M_PI);
 
 
-            winkelL = - angleXY;
+//24            winkelL = - angleXY;
 
 //            printf("winkel xy %d yz %d zx %d \n", angleXY, angleYZ, angleZX);
 
 
 
-            // if (LDir == H) winkelL = winkelL + vL/10.; else winkelL = winkelL - vL/10.;
-            // if (RDir == H) winkelL = winkelL + vR/10.; else winkelL = winkelL - vR/10.;
+            if (LDir == H) winkelL = winkelL + vL/10.; else winkelL = winkelL - vL/10.;
+            if (RDir == H) winkelL = winkelL + vR/10.; else winkelL = winkelL - vR/10.;
 
             if (abs((winkelL - oldWinkelL)) > 5) // to avoid interferece
             {
@@ -525,8 +657,19 @@ void IRAM_ATTR myTimer(void)   // periodic timer interrupt, expires each 0.1 mse
     }
 
     // PWM:
+    if (motorSys == 0) 
+    {
+        if (ramp > vL) digitalWrite(WHEEL_L, L);  else digitalWrite(WHEEL_L, H);
+        if (ramp > vR) digitalWrite(WHEEL_R, L);  else digitalWrite(WHEEL_R, H);
+    }
+    if (motorSys == 1)
+    { 
+        if (LDir) if (ramp < vL) digitalWrite(WHEEL_L, L);  else digitalWrite(WHEEL_L, H);
+        else      if (ramp > vL) digitalWrite(WHEEL_L, L);  else digitalWrite(WHEEL_L, H);
 
-    if (ramp > vL) digitalWrite(WHEEL_L, L);  else digitalWrite(WHEEL_L, H);
-    if (ramp > vR) digitalWrite(WHEEL_R, L);  else digitalWrite(WHEEL_R, H);
+        if (RDir) if (ramp < vR) digitalWrite(WHEEL_R, L);  else digitalWrite(WHEEL_R, H);
+        else      if (ramp > vR) digitalWrite(WHEEL_R, L);  else digitalWrite(WHEEL_R, H);
+
+    }
 
 }
