@@ -2,7 +2,7 @@
 
                         LoLin32 psController 
 
-                                                  қuran machr 2024
+                                                  қuran  dec 2024
 ******************************************************************/
 
 #include <Arduino.h>
@@ -26,12 +26,13 @@
 #define FALSE                           false
 #define WAIT_ONE_SEC                    10000
 #define WAIT_250_MSEC                   2500
-#define WAIT_ONE_10MSEC                 100
+#define WAIT_ONE_10MSEC                 100 // for a better performance 
+                                          // instead of 100 .. 
 
 #define H                               HIGH
 #define L                               LOW
 
-//  --- #define ON_BOARD_LED                    5
+#define ON_BOARD_LED                    5
 
 #define NUM_LEDS                        4
 #define DATA_PIN                        23
@@ -80,6 +81,7 @@ volatile int oldWinkelL = 0;
 volatile int go;
 volatile int startWiFi = 0;
 
+
 String receivedText = ""; // Variable zum Speichern der empfangenen Daten
 String ssidFromEEPROM = "";
 String passwordFromEEPROM = "";
@@ -90,6 +92,7 @@ volatile int motorSys = 0;
                             
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
+
 
 /*
 IPAddress lclIP(192,168,2,219);
@@ -124,7 +127,7 @@ void initWiFi()
     WiFi.begin(ssidFromEEPROM, passwordFromEEPROM);
 
     printf("Connection to WiFi . . .");
-    while ((WiFi.status() != WL_CONNECTED) && (startWiFi < 21))
+    while ((WiFi.status() != WL_CONNECTED) && (startWiFi < 12))  // 12 instead of 21... 
     {
         delay(1000);
         printf(" .");
@@ -145,7 +148,7 @@ String processor(const String& var)
 
     if (var == "STATE") 
     {
-        if (digitalRead(led5))
+        if (digitalRead(led5)) // hier sollte man vielleicht go verwenden 
         {
             ledState = 1; return "ON";
             printf("on\n");
@@ -264,6 +267,9 @@ void setup()
     printf("start!");
     go = 1; 
 
+    batteryLevel = analogRead(BATTERY_LEVEL) / REFV;
+    
+    
     if (!EEPROM.begin(EEPROM_SIZE)) {
         Serial.println("EEPROM initialisieren fehlgeschlagen!");
         return;
@@ -274,15 +280,17 @@ void setup()
     //dataToRead = 0;
     //dataToRead = EEPROM.read(EEPROM_ADDR);
     
-    Serial.println("Daten gelesen: \n" + String(dataToRead));
+    //Serial.println("Daten gelesen: \n" + String(dataToRead));
 
     ssidFromEEPROM = readFromEEPROM(EEPROM_SSID_ADDR);
-    printf("im EEPROM gefunden: .%s.\n", ssidFromEEPROM);
+    //printf("im EEPROM gefunden: .%s.\n", ssidFromEEPROM);
     passwordFromEEPROM = readFromEEPROM(EEPROM_PASSWORD_ADDR);
-    printf("im PASSWOR gefunden: .%s.\n", passwordFromEEPROM);
+    //printf("im PASSWOR gefunden: .%s.\n", passwordFromEEPROM);
     motorSysFromEEPROM = readFromEEPROM(EEPROM_MOTOR_SYS_ADDR);
     motorSys = (char)motorSysFromEEPROM[0] - '0';
+    
     printf("MotorSystem: .%d.\n", motorSys);
+    printf("battery level: %f\n", batteryLevel);
 
 
     timer = timerBegin(0, 80, true);
@@ -298,7 +306,7 @@ void setup()
 
     printf("ready!\n");
 
-    // -- pinMode(ON_BOARD_LED, OUTPUT);
+    //pinMode(ON_BOARD_LED, OUTPUT); anstelle ON_BOARD_LED led5 ... 
     pinMode(led5, OUTPUT);
 
     pinMode(WHEEL_L, OUTPUT);
@@ -330,11 +338,54 @@ void setup()
 // Fast Leds:
 
     FastLED.addLeds<SK9822, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
-    
-    leds[0] = CRGB{255, 255, 255}; // R B G
-    leds[1] = CRGB{255, 255, 255};
-    leds[2] = CRGB{255, 255, 255};
-    leds[3] = CRGB{255, 255, 255};
+
+
+
+if (batteryLevel > 4.8)
+{ 
+
+    leds[0] = CRGB{0, 0, 255}; // R B G
+    leds[1] = CRGB{0, 0, 255};
+    leds[2] = CRGB{0, 0, 255};
+    leds[3] = CRGB{0, 0, 255};
+}
+else 
+if (batteryLevel > 4.2)
+{ 
+
+    leds[0] = CRGB{255, 0, 255}; // R B G
+    leds[1] = CRGB{0, 0, 255};
+    leds[2] = CRGB{0, 0, 255};
+    leds[3] = CRGB{0, 0, 255};
+}
+else 
+if (batteryLevel > 3.6)
+{ 
+
+    leds[0] = CRGB{255, 0, 255}; // R B G
+    leds[1] = CRGB{0, 0, 255};
+    leds[2] = CRGB{255, 0, 255};
+    leds[3] = CRGB{0, 0, 255};
+}
+else 
+if (batteryLevel > 3.2)
+{ 
+
+    leds[0] = CRGB{255, 0, 255}; // R B G
+    leds[1] = CRGB{255, 0, 0};
+    leds[2] = CRGB{255, 0, 255};
+    leds[3] = CRGB{255, 0, 0};
+}
+else 
+{ 
+
+    leds[0] = CRGB{255, 0, 0}; // R B G
+    leds[1] = CRGB{255, 0, 0};
+    leds[2] = CRGB{255, 0, 0};
+    leds[3] = CRGB{255, 0, 0};
+}
+
+
 
     FastLED.show();
 
@@ -397,6 +448,8 @@ void loop()
 
             batteryLevel = analogRead(BATTERY_LEVEL) / REFV;
 
+
+
             //batteryLevel += 3.75;  // for tests only
             
             //if (batteryLevel > 359) batteryLevel = 0;
@@ -428,6 +481,8 @@ void loop()
         {
             qSecFlag = FALSE;
 
+
+
             pulse = pulse ? 0 : 1;
 
             // digitalWrite(ON_BOARD_LED, pulse);
@@ -457,31 +512,31 @@ void loop()
                 switch(pointer)
                 {
                     case 0:
-                        leds[0] = CRGB{255, 255, 255}; // R B G
-                        leds[1] = CRGB{255, 255, 255};
+                        leds[0] = CRGB{0, 0, 255}; // R B G
+                        leds[1] = CRGB{0, 0, 255};
                         leds[2] = CRGB{0, 0, 0};  // Yellow: FF00FF
                         leds[3] = CRGB{0, 0, 0};
                     break;
 
                     case 1:
                         leds[0] = CRGB{0, 0, 0}; // R B G
-                        leds[1] = CRGB{255, 255, 255};
-                        leds[2] = CRGB{255, 255, 255};  // Yellow: FF00FF
+                        leds[1] = CRGB{0, 0, 255};
+                        leds[2] = CRGB{0, 0, 255};  // Yellow: FF00FF
                         leds[3] = CRGB{0, 0, 0};
                     break;
 
                     case 2:
                         leds[0] = CRGB{0, 0, 0}; // R B G
                         leds[1] = CRGB{0, 0, 0};
-                        leds[2] = CRGB{255, 255, 255};  // Yellow: FF00FF
-                        leds[3] = CRGB{255, 255, 255};
+                        leds[2] = CRGB{0, 0, 255};  // Yellow: FF00FF
+                        leds[3] = CRGB{0, 0, 255};
                     break;
 
                     case 3:
-                        leds[0] = CRGB{255, 255, 255}; // R B G
+                        leds[0] = CRGB{0, 0, 255}; // R B G
                         leds[1] = CRGB{0, 0, 0};
                         leds[2] = CRGB{0, 0, 0};  // Yellow: FF00FF
-                        leds[3] = CRGB{255, 255, 255};
+                        leds[3] = CRGB{0, 0, 255};
                     break;
                 }
 
@@ -615,6 +670,7 @@ void loop()
             {
                 vL = PS4.L2Value();
                 vR = PS4.R2Value();
+                
             
                 if(PS4.L1()) {LDir = LDir ? 0 : 1;  digitalWrite(WHEEL_L_DIRECTION, LDir);}
                 if(PS4.R1()) {RDir = RDir ? 0 : 1;  digitalWrite(WHEEL_R_DIRECTION, RDir);}
